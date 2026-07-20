@@ -90,38 +90,39 @@ Registered tools: ['load_csv', 'profile_data', 'clean_data', 'detect_outliers', 
 
 ## Use as an MCP server
 
-`mcp_server.py` exposes the pipeline over the [Model Context Protocol](https://modelcontextprotocol.io), so any MCP-compatible client — Claude Desktop, Claude Code, or another MCP host — can run it directly:
+`mcp_server.py` exposes the pipeline over the [Model Context Protocol](https://modelcontextprotocol.io) — the same protocol Claude Desktop, Claude Code, and other AI clients use to call external tools. It defines:
 
-- **Tool `analyze_csv(csv_path, group_by, metric, goal)`** — Claude calls this itself when you ask in plain language, e.g. *"analyze data/sales_data.csv, grouped by region, summing revenue."* This is how a friend would use it: point Claude at a CSV and describe what they want, no code required.
-- **Prompt `analyze`** — this is the actual "/" mechanism in MCP (tools are *not* slash-invoked). Once connected, it shows up as `/agentflow:analyze` in clients that support MCP prompts (Claude Desktop does; Claude Code support varies by version).
+- **Tool `analyze_csv(csv_path, group_by, metric, goal)`** — runs the full orchestrator → planner → analyst → reviewer → reporter pipeline on a CSV and returns the executive summary plus paths to the generated report and chart.
+- **Tool `list_capabilities()`** — lists the registered analysis tools.
+- **Prompt `analyze`** — a slash-command scaffold (`/agentflow:analyze`). MCP prompts, not tools, are what clients render as "/" commands. Whether this actually appears as a slash command depends on the client: it requires a local stdio MCP connection, which is supported by the classic Claude Desktop app (Settings → Developer → local MCP servers) but generally **not** by hosted/managed Cowork-style deployments, which only accept remote MCP servers reachable at a public HTTPS URL. Publishing this server publicly so it works that way is a separate infrastructure project, out of scope here.
 
-Install and register with Claude Desktop — edit `claude_desktop_config.json` (Settings → Developer → Edit Config):
+**Verified working**: tested end-to-end with the official [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector), which speaks the real MCP protocol over stdio — the same transport a desktop client would use:
+
+```bash
+pip install -r requirements.txt
+mcp dev mcp_server.py
+```
+
+Open the printed Inspector URL, connect, go to **Tools**, and call `analyze_csv` with a CSV path, `group_by`, and `metric`. This confirms the server correctly implements the MCP tool-calling contract, independent of any specific chat client.
+
+If you do have a classic Claude Desktop install with local MCP server support enabled, register it via `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "agentflow": {
-      "command": "python3",
-      "args": ["/absolute/path/to/agentflow/mcp_server.py"],
+      "command": "uv",
+      "args": ["run", "--with", "mcp", "mcp", "run", "/absolute/path/to/agentflow/mcp_server.py"],
       "env": { "ANTHROPIC_API_KEY": "sk-ant-..." }
     }
   }
 }
 ```
 
-Restart Claude Desktop, then either type `/agentflow:analyze` or just ask: *"Use agentflow to analyze my sales CSV by region."*
-
-For Claude Code, register the same server with:
+For Claude Code:
 
 ```bash
-claude mcp add agentflow python3 /absolute/path/to/agentflow/mcp_server.py
-```
-
-Test it standalone first (no client needed) with the bundled [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector):
-
-```bash
-pip install -r requirements.txt
-mcp dev mcp_server.py
+claude mcp add agentflow uv run --with mcp mcp run /absolute/path/to/agentflow/mcp_server.py
 ```
 
 Each call writes its report/chart to `<csv folder>/agentflow_output/<name>_<timestamp>/`, so concurrent analyses never collide.
