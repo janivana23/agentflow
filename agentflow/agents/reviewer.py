@@ -5,11 +5,13 @@ import json
 from pathlib import Path
 
 from ..core.agent import BaseAgent
+from ..core.llm import extract_json
 from ..core.message import Message, MessageType, Role
 from ..toolkit.data_tools import ctx
 
 SYSTEM = """You are a QA reviewer for data analysis pipelines. Given execution
-evidence, return JSON {"verdict": "approve"|"revise", "issues": [...]}."""
+evidence, return JSON {"verdict": "approve"|"revise", "issues": [...]}.
+Return ONLY the raw JSON object — no markdown fences, no commentary."""
 
 
 class ReviewerAgent(BaseAgent):
@@ -27,7 +29,7 @@ class ReviewerAgent(BaseAgent):
             ],
         }
         raw = self.llm.complete(SYSTEM, f"REVIEW_REQUEST:{json.dumps(evidence)}")
-        verdict = json.loads(raw)
+        verdict = json.loads(extract_json(raw))
         return Message(self.role, Role.ORCHESTRATOR, MessageType.REVIEW,
                        {"verdict": verdict["verdict"], "issues": verdict["issues"],
                         "evidence": evidence})

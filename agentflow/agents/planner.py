@@ -4,11 +4,13 @@ from __future__ import annotations
 import json
 
 from ..core.agent import BaseAgent
+from ..core.llm import extract_json
 from ..core.message import Message, MessageType, PlanStep, Role
 
 SYSTEM = """You are a data-analysis planner. Given a goal and a tool catalog,
 return a JSON array of steps: [{"tool": ..., "args": {...}, "rationale": ...}].
-Only use tools from the catalog. Order matters."""
+Only use tools from the catalog. Order matters.
+Return ONLY the raw JSON array — no markdown fences, no commentary."""
 
 
 class PlannerAgent(BaseAgent):
@@ -23,7 +25,7 @@ class PlannerAgent(BaseAgent):
         raw = self.llm.complete(SYSTEM, prompt)
         steps = [
             PlanStep(step_id=i, tool=s["tool"], args=s["args"], rationale=s["rationale"])
-            for i, s in enumerate(json.loads(raw), start=1)
+            for i, s in enumerate(json.loads(extract_json(raw)), start=1)
         ]
         # Guardrail: reject hallucinated tools before execution.
         unknown = [s.tool for s in steps if s.tool not in self.tools.names()]

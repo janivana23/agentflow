@@ -18,6 +18,26 @@ import os
 from abc import ABC, abstractmethod
 
 
+def extract_json(text: str) -> str:
+    """Best-effort extraction of a JSON payload from an LLM response.
+
+    Real models often wrap JSON in markdown fences or add commentary.
+    This strips fences and surrounding prose so json.loads() is reliable —
+    a robustness layer every LLM-integrated system needs.
+    """
+    text = text.strip()
+    if "```" in text:
+        text = text.split("```")[1]
+        text = text.removeprefix("json").strip()
+    starts = [i for i in (text.find("["), text.find("{")) if i != -1]
+    if starts:
+        start = min(starts)
+        end = max(text.rfind("]"), text.rfind("}")) + 1
+        if end > start:
+            text = text[start:end]
+    return text.strip()
+
+
 class LLMBackend(ABC):
     @abstractmethod
     def complete(self, system: str, prompt: str) -> str:
