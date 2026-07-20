@@ -57,7 +57,12 @@ class AnthropicBackend(LLMBackend):
             system=system,
             messages=[{"role": "user", "content": prompt}],
         )
-        return resp.content[0].text
+        # Responses may contain thinking blocks before the text block —
+        # extract only text content rather than assuming content[0].
+        return "".join(
+            block.text for block in resp.content
+            if getattr(block, "type", None) == "text"
+        )
 
 
 class HeuristicBackend(LLMBackend):
