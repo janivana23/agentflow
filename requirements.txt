@@ -1,0 +1,4 @@
+pandas>=2.0
+matplotlib>=3.7
+tabulate>=0.9
+anthropic>=0.40  # optional: only needed for LLM-driven planning
