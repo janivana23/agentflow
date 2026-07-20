@@ -22,6 +22,16 @@ class AnalysisContext:
     artifacts: dict[str, str] = field(default_factory=dict)
     out_dir: Path = Path("outputs")
 
+    def reset(self, out_dir: str | Path | None = None) -> None:
+        """Clear state between runs — required for long-lived processes
+        (e.g. an MCP server) that execute multiple analyses in one process,
+        since ctx is a module-level singleton shared by all tool calls."""
+        self.df = None
+        self.findings = []
+        self.artifacts = {}
+        if out_dir is not None:
+            self.out_dir = Path(out_dir)
+
 
 ctx = AnalysisContext()
 
@@ -54,7 +64,7 @@ def profile_data() -> dict[str, Any]:
 def clean_data() -> dict[str, Any]:
     df = ctx.df
     before = len(df)
-    df = df.drop_duplicates()
+    df = df.drop_duplicates().copy()
     num_cols = df.select_dtypes("number").columns
     df[num_cols] = df[num_cols].fillna(df[num_cols].median())
     df = df.dropna()
@@ -115,7 +125,7 @@ def make_chart(kind: str = "bar") -> dict[str, Any]:
     ax.set_ylabel(metric)
     fig.tight_layout()
 
-    ctx.out_dir.mkdir(exist_ok=True)
+    ctx.out_dir.mkdir(parents=True, exist_ok=True)
     path = ctx.out_dir / "chart.png"
     fig.savefig(path, dpi=120)
     plt.close(fig)
@@ -125,7 +135,7 @@ def make_chart(kind: str = "bar") -> dict[str, Any]:
 
 @registry.register("Write a markdown report of all findings and artifacts.")
 def write_report() -> dict[str, Any]:
-    ctx.out_dir.mkdir(exist_ok=True)
+    ctx.out_dir.mkdir(parents=True, exist_ok=True)
     path = ctx.out_dir / "report.md"
     lines = ["# Analysis Report", "", "## Key findings", ""]
     lines += [f"- {f}" for f in ctx.findings]

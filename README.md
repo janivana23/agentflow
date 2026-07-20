@@ -64,6 +64,9 @@ agentflow/
 │   └── reporter.py
 └── toolkit/
     └── data_tools.py  # domain capabilities (swap for another domain)
+
+mcp_server.py          # exposes the pipeline as MCP tools/prompts
+run_demo.py             # standalone CLI demo (no MCP client needed)
 ```
 
 ## Run it
@@ -84,6 +87,44 @@ Registered tools: ['load_csv', 'profile_data', 'clean_data', 'detect_outliers', 
 ...
 "status": "success", "iterations": 1, "verdict": "approve"
 ```
+
+## Use as an MCP server
+
+`mcp_server.py` exposes the pipeline over the [Model Context Protocol](https://modelcontextprotocol.io), so any MCP-compatible client — Claude Desktop, Claude Code, or another MCP host — can run it directly:
+
+- **Tool `analyze_csv(csv_path, group_by, metric, goal)`** — Claude calls this itself when you ask in plain language, e.g. *"analyze data/sales_data.csv, grouped by region, summing revenue."* This is how a friend would use it: point Claude at a CSV and describe what they want, no code required.
+- **Prompt `analyze`** — this is the actual "/" mechanism in MCP (tools are *not* slash-invoked). Once connected, it shows up as `/agentflow:analyze` in clients that support MCP prompts (Claude Desktop does; Claude Code support varies by version).
+
+Install and register with Claude Desktop — edit `claude_desktop_config.json` (Settings → Developer → Edit Config):
+
+```json
+{
+  "mcpServers": {
+    "agentflow": {
+      "command": "python3",
+      "args": ["/absolute/path/to/agentflow/mcp_server.py"],
+      "env": { "ANTHROPIC_API_KEY": "sk-ant-..." }
+    }
+  }
+}
+```
+
+Restart Claude Desktop, then either type `/agentflow:analyze` or just ask: *"Use agentflow to analyze my sales CSV by region."*
+
+For Claude Code, register the same server with:
+
+```bash
+claude mcp add agentflow python3 /absolute/path/to/agentflow/mcp_server.py
+```
+
+Test it standalone first (no client needed) with the bundled [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector):
+
+```bash
+pip install -r requirements.txt
+mcp dev mcp_server.py
+```
+
+Each call writes its report/chart to `<csv folder>/agentflow_output/<name>_<timestamp>/`, so concurrent analyses never collide.
 
 ## Extending
 
